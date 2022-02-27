@@ -12,27 +12,22 @@ on:
       - main
 permissions:
   contents: write
-name: Process Content
+name: Generate Baseline Catalogs with Profiles
 env:
   OSCAL_DIR_PATH: vendor/oscal
   CICD_DIR_PATH: vendor/oscal/build/ci-cd
   CONTENT_CONFIG_PATH: src/config
   SAXON_VERSION: 9.9.0-1
-  HOME_REPO: GSA/fedramp-automation
 jobs:
   validate-and-publish-content:
     name: Generate Agency Baselines
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout source code and content
+        uses: actions/checkout@v2
         with:
           path: git-content
           submodules: recursive
-          # Only update `fetch-depth` for debugging on branches.
-          # If not, this action cannot see other branches for names for the PR to push back changes.
-          # So, on PR branches without this, you will have errors.
-          # fetch-depth: 0
-      # job-validate-content
       - name: Update APT package metadata
         run: |
           sudo rm -rf /var/lib/apt/lists/* && sudo apt-get update
@@ -57,15 +52,13 @@ jobs:
           mvn org.apache.maven.plugins:maven-dependency-plugin:2.10:get -DartifactId=Saxon-HE -DgroupId=net.sf.saxon -Dversion=$SAXON_VERSION
       - name: Validate Content
         run:
-          # mkdir -p "${OSCAL_BUILD_DIR_PATH}"
           bash "${GITHUB_WORKSPACE}/git-content/${CICD_DIR_PATH}/validate-content.sh" -v -o "${GITHUB_WORKSPACE}/git-content/${OSCAL_DIR_PATH}" -a "${GITHUB_WORKSPACE}/git-content" -c "${GITHUB_WORKSPACE}/git-content/${CONTENT_CONFIG_PATH}"
-      # job-copy-and-convert-content
-      - name: Auto-convert Content
+      - name: Auto-convert content
         run:
           bash "${GITHUB_WORKSPACE}/git-content/${CICD_DIR_PATH}/copy-and-convert-content.sh" -v -o "${GITHUB_WORKSPACE}/git-content/${OSCAL_DIR_PATH}" -a "${GITHUB_WORKSPACE}/git-content" -c "${GITHUB_WORKSPACE}/git-content/${CONTENT_CONFIG_PATH}" -w "${GITHUB_WORKSPACE}/git-content/dist" --resolve-profiles
-      # job-deploy-artifacts
-        if: github.repository == env.HOME_REPO && github.ref == 'refs/heads/main'
+      - name: Upload updated content to repo
         uses: stefanzweifel/git-auto-commit-action@v4.4.1
+        if: github.ref == 'refs/heads/main'
         with:
           repository: git-content
           commit_message: Publishing auto-converted artifacts
